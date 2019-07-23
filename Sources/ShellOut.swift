@@ -15,9 +15,9 @@ import Dispatch
  *  - parameter command: The command to run
  *  - parameter arguments: The arguments to pass to the command
  *  - parameter path: The path to execute the commands at (defaults to current folder)
- *  - parameter outputHandle: Any `FileHandle` that any output (STDOUT) should be redirected to
+ *  - parameter outputHandle: Any `Handle` that any output (STDOUT) should be redirected to
  *              (at the moment this is only supported on macOS)
- *  - parameter errorHandle: Any `FileHandle` that any error output (STDERR) should be redirected to
+ *  - parameter errorHandle: Any `Handle` that any error output (STDERR) should be redirected to
  *              (at the moment this is only supported on macOS)
  *
  *  - returns: The output of running the command
@@ -29,8 +29,8 @@ import Dispatch
 @discardableResult public func shellOut(to command: String,
                                         arguments: [String] = [],
                                         at path: String = ".",
-                                        outputHandle: FileHandle? = nil,
-                                        errorHandle: FileHandle? = nil) throws -> String {
+                                        outputHandle: Handle? = nil,
+                                        errorHandle: Handle? = nil) throws -> String {
     let process = Process()
     let command = "cd \(path.escapingSpaces) && \(command) \(arguments.joined(separator: " "))"
     return try process.launchBash(with: command, outputHandle: outputHandle, errorHandle: errorHandle)
@@ -41,9 +41,9 @@ import Dispatch
  *
  *  - parameter commands: The commands to run
  *  - parameter path: The path to execute the commands at (defaults to current folder)
- *  - parameter outputHandle: Any `FileHandle` that any output (STDOUT) should be redirected to
+ *  - parameter outputHandle: Any `Handle` that any output (STDOUT) should be redirected to
  *              (at the moment this is only supported on macOS)
- *  - parameter errorHandle: Any `FileHandle` that any error output (STDERR) should be redirected to
+ *  - parameter errorHandle: Any `Handle` that any error output (STDERR) should be redirected to
  *              (at the moment this is only supported on macOS)
  *
  *  - returns: The output of running the command
@@ -54,8 +54,8 @@ import Dispatch
  */
 @discardableResult public func shellOut(to commands: [String],
                                         at path: String = ".",
-                                        outputHandle: FileHandle? = nil,
-                                        errorHandle: FileHandle? = nil) throws -> String {
+                                        outputHandle: Handle? = nil,
+                                        errorHandle: Handle? = nil) throws -> String {
     let command = commands.joined(separator: " && ")
     return try shellOut(to: command, at: path, outputHandle: outputHandle, errorHandle: errorHandle)
 }
@@ -65,8 +65,8 @@ import Dispatch
  *
  *  - parameter command: The command to run
  *  - parameter path: The path to execute the commands at (defaults to current folder)
- *  - parameter outputHandle: Any `FileHandle` that any output (STDOUT) should be redirected to
- *  - parameter errorHandle: Any `FileHandle` that any error output (STDERR) should be redirected to
+ *  - parameter outputHandle: Any `Handle` that any output (STDOUT) should be redirected to
+ *  - parameter errorHandle: Any `Handle` that any error output (STDERR) should be redirected to
  *
  *  - returns: The output of running the command
  *  - throws: `ShellOutError` in case the command couldn't be performed, or it returned an error
@@ -78,8 +78,8 @@ import Dispatch
  */
 @discardableResult public func shellOut(to command: ShellOutCommand,
                                         at path: String = ".",
-                                        outputHandle: FileHandle? = nil,
-                                        errorHandle: FileHandle? = nil) throws -> String {
+                                        outputHandle: Handle? = nil,
+                                        errorHandle: Handle? = nil) throws -> String {
     return try shellOut(to: command.string, at: path, outputHandle: outputHandle, errorHandle: errorHandle)
 }
 
@@ -158,7 +158,7 @@ public extension ShellOutCommand {
     /// Checkout a given git branch
     static func gitCheckout(branch: String) -> ShellOutCommand {
         let command = "git checkout".appending(argument: branch)
-                                    .appending(" --quiet")
+            .appending(" --quiet")
 
         return ShellOutCommand(string: command)
     }
@@ -185,24 +185,24 @@ public extension ShellOutCommand {
     /// Move a file from one path to another
     static func moveFile(from originPath: String, to targetPath: String) -> ShellOutCommand {
         let command = "mv".appending(argument: originPath)
-                          .appending(argument: targetPath)
+            .appending(argument: targetPath)
 
         return ShellOutCommand(string: command)
     }
-    
+
     /// Copy a file from one path to another
     static func copyFile(from originPath: String, to targetPath: String) -> ShellOutCommand {
         let command = "cp".appending(argument: originPath)
-                          .appending(argument: targetPath)
-        
+            .appending(argument: targetPath)
+
         return ShellOutCommand(string: command)
     }
-    
+
     /// Remove a file
     static func removeFile(from path: String, arguments: [String] = ["-f"]) -> ShellOutCommand {
         let command = "rm".appending(arguments: arguments)
-                          .appending(argument: path)
-        
+            .appending(argument: path)
+
         return ShellOutCommand(string: command)
     }
 
@@ -221,7 +221,7 @@ public extension ShellOutCommand {
     /// Create a symlink at a given path, to a given target
     static func createSymlink(to targetPath: String, at linkPath: String) -> ShellOutCommand {
         let command = "ln -s".appending(argument: targetPath)
-                             .appending(argument: linkPath)
+            .appending(argument: linkPath)
 
         return ShellOutCommand(string: command)
     }
@@ -238,7 +238,7 @@ public extension ShellOutCommand {
     /// Run a Marathon Swift script
     static func runMarathonScript(at path: String, arguments: [String] = []) -> ShellOutCommand {
         let command = "marathon run".appending(argument: path)
-                                    .appending(arguments: arguments)
+            .appending(arguments: arguments)
 
         return ShellOutCommand(string: command)
     }
@@ -329,11 +329,11 @@ public struct ShellOutError: Swift.Error {
 extension ShellOutError: CustomStringConvertible {
     public var description: String {
         return """
-               ShellOut encountered an error
-               Status code: \(terminationStatus)
-               Message: "\(message)"
-               Output: "\(output)"
-               """
+        ShellOut encountered an error
+        Status code: \(terminationStatus)
+        Message: "\(message)"
+        Output: "\(output)"
+        """
     }
 }
 
@@ -343,11 +343,34 @@ extension ShellOutError: LocalizedError {
     }
 }
 
+/// Protocol adopted by objects that handles command output
+public protocol Handle {
+    /// Method called each time command provide new output data
+    func handle(data: Data)
+
+    /// Optional method called when command has finished to close the handle
+    func endHandling()
+}
+
+public extension Handle {
+    func endHandling() {}
+}
+
+extension FileHandle: Handle {
+    public func handle(data: Data) {
+        write(data)
+    }
+
+    public func endHandling() {
+        if shouldBeClosed { closeFile() }
+    }
+}
+
 // MARK: - Private
 
 private extension Process {
-    @discardableResult func launchBash(with command: String, outputHandle: FileHandle? = nil, errorHandle: FileHandle? = nil) throws -> String {
-        launchPath = "/usr/bin/env bash"
+    @discardableResult func launchBash(with command: String, outputHandle: Handle? = nil, errorHandle: Handle? = nil) throws -> String {
+        launchPath = "/bin/bash"
         arguments = ["-c", command]
 
         // Because FileHandle's readabilityHandler might be called from a
@@ -367,18 +390,18 @@ private extension Process {
 
         #if !os(Linux)
         outputPipe.fileHandleForReading.readabilityHandler = { handler in
+            let data = handler.availableData
             outputQueue.async {
-                let data = handler.availableData
                 outputData.append(data)
-                outputHandle?.write(data)
+                outputHandle?.handle(data: data)
             }
         }
 
         errorPipe.fileHandleForReading.readabilityHandler = { handler in
+            let data = handler.availableData
             outputQueue.async {
-                let data = handler.availableData
                 errorData.append(data)
-                errorHandle?.write(data)
+                errorHandle?.handle(data: data)
             }
         }
         #endif
@@ -394,8 +417,8 @@ private extension Process {
 
         waitUntilExit()
 
-        outputHandle?.closeFile()
-        errorHandle?.closeFile()
+        outputHandle?.endHandling()
+        errorHandle?.endHandling()
 
         #if !os(Linux)
         outputPipe.fileHandleForReading.readabilityHandler = nil
@@ -415,6 +438,14 @@ private extension Process {
 
             return outputData.shellOutput()
         }
+    }
+}
+
+private extension FileHandle {
+    var shouldBeClosed: Bool {
+        return self !== FileHandle.standardOutput &&
+            self !== FileHandle.standardError &&
+            self !== FileHandle.standardInput
     }
 }
 
